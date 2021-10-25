@@ -19,19 +19,27 @@
 include $(top_srcdir)/config/eu.am
 DEFS += $(YYDEBUG) -DDEBUGPRED=@DEBUGPRED@ \
 	-DSRCDIR=\"$(shell cd $(srcdir);pwd)\" -DOBJDIR=\"$(shell pwd)\"
+CFLAGS += -c -I$(srcdir)/../libelf -I$(srcdir)/../libebl \
+	    -I$(srcdir)/../libdw -I$(srcdir)/../libdwelf \
+	    -I$(srcdir)/../libdwfl -I$(srcdir)/../libasm \
+		-I$(srcdir)/../lib/ -I$(srcdir)/../ \ 
+		-Wno-unused-function -g -Wno-error=format-overflow
 AM_CPPFLAGS += -I$(srcdir)/../libelf -I$(srcdir)/../libebl \
 	    -I$(srcdir)/../libdw -I$(srcdir)/../libdwelf \
-	    -I$(srcdir)/../libdwfl -I$(srcdir)/../libasm
+	    -I$(srcdir)/../libdwfl -I$(srcdir)/../libasm \
+		-Wno-unused-function -g -Wno-error=format-overflow
 
 AM_LDFLAGS = -Wl,-rpath-link,../libelf:../libdw $(STACK_USAGE_NO_ERROR)
+LDFLAGS += -Wl,-rpath-link,../libelf:../libdw $(STACK_USAGE_NO_ERROR)
 
 bin_PROGRAMS = readelf nm size strip elflint findtextrel addr2line \
 	       elfcmp objdump ranlib strings ar unstrip stack elfcompress \
 	       elfclassify
 
-noinst_LIBRARIES = libar.a
+noinst_LIBRARIES = libar.a libreadelf.a
 
 libar_a_SOURCES = arlib.c arlib2.c arlib-argp.c
+libreadelf_a_SOURCES = libreadelf.c
 
 EXTRA_DIST = arlib.h debugpred.h
 
@@ -56,6 +64,8 @@ demanglelib = -lstdc++
 endif
 
 # Bad, bad stack usage...
+libreadelf_no_format_overflow = yes
+libreadelf_no_Wstack_usage = yes
 readelf_no_Wstack_usage = yes
 nm_no_Wstack_usage = yes
 size_no_Wstack_usage = yes

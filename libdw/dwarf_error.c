@@ -37,7 +37,7 @@
 
 
 /* The error number.  */
-static __thread int global_error;
+static int global_error;
 
 
 int

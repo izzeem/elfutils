@@ -1,0 +1,550 @@
+--- readelf.c	2021-10-27 20:37:05.246324139 +0000
++++ libreadelf.c	2021-10-27 20:34:51.178720238 +0000
+@@ -19,7 +19,6 @@
+ # include <config.h>
+ #endif
+ 
+-#include <argp.h>
+ #include <assert.h>
+ #include <ctype.h>
+ #include <dwarf.h>
+@@ -91,81 +90,6 @@
+    see __libdw_link_skel_split in print_debug.  */
+ static bool do_not_close_dwfl = false;
+ 
+-/* Definitions of arguments for argp functions.  */
+-static const struct argp_option options[] =
+-{
+-  { NULL, 0, NULL, 0, N_("ELF input selection:"), 0 },
+-  { "elf-section", ELF_INPUT_SECTION, "SECTION", OPTION_ARG_OPTIONAL,
+-    N_("Use the named SECTION (default .gnu_debugdata) as (compressed) ELF "
+-       "input data"), 0 },
+-  { "dwarf-skeleton", DWARF_SKELETON, "FILE", 0,
+-    N_("Used with -w to find the skeleton Compile Units in FILE associated "
+-       "with the Split Compile units in a .dwo input file"), 0 },
+-  { NULL, 0, NULL, 0, N_("ELF output selection:"), 0 },
+-  { "all", 'a', NULL, 0,
+-    N_("All these plus -p .strtab -p .dynstr -p .comment"), 0 },
+-  { "dynamic", 'd', NULL, 0, N_("Display the dynamic segment"), 0 },
+-  { "file-header", 'h', NULL, 0, N_("Display the ELF file header"), 0 },
+-  { "histogram", 'I', NULL, 0,
+-    N_("Display histogram of bucket list lengths"), 0 },
+-  { "program-headers", 'l', NULL, 0, N_("Display the program headers"), 0 },
+-  { "segments", 'l', NULL, OPTION_ALIAS | OPTION_HIDDEN, NULL, 0 },
+-  { "relocs", 'r', NULL, 0, N_("Display relocations"), 0 },
+-  { "section-groups", 'g', NULL, 0, N_("Display the section groups"), 0 },
+-  { "section-headers", 'S', NULL, 0, N_("Display the sections' headers"), 0 },
+-  { "sections", 'S', NULL, OPTION_ALIAS | OPTION_HIDDEN, NULL, 0 },
+-  { "symbols", 's', "SECTION", OPTION_ARG_OPTIONAL,
+-    N_("Display the symbol table sections"), 0 },
+-  { "dyn-syms", PRINT_DYNSYM_TABLE, NULL, 0,
+-    N_("Display (only) the dynamic symbol table"), 0 },
+-  { "version-info", 'V', NULL, 0, N_("Display versioning information"), 0 },
+-  { "notes", 'n', "SECTION", OPTION_ARG_OPTIONAL, N_("Display the ELF notes"), 0 },
+-  { "arch-specific", 'A', NULL, 0,
+-    N_("Display architecture specific information, if any"), 0 },
+-  { "exception", 'e', NULL, 0,
+-    N_("Display sections for exception handling"), 0 },
+-
+-  { NULL, 0, NULL, 0, N_("Additional output selection:"), 0 },
+-  { "debug-dump", 'w', "SECTION", OPTION_ARG_OPTIONAL,
+-    N_("Display DWARF section content.  SECTION can be one of abbrev, addr, "
+-       "aranges, decodedaranges, frame, gdb_index, info, info+, loc, line, "
+-       "decodedline, ranges, pubnames, str, macinfo, macro or exception"), 0 },
+-  { "hex-dump", 'x', "SECTION", 0,
+-    N_("Dump the uninterpreted contents of SECTION, by number or name"), 0 },
+-  { "strings", 'p', "SECTION", OPTION_ARG_OPTIONAL,
+-    N_("Print string contents of sections"), 0 },
+-  { "string-dump", 'p', NULL, OPTION_ALIAS | OPTION_HIDDEN, NULL, 0 },
+-  { "archive-index", 'c', NULL, 0,
+-    N_("Display the symbol index of an archive"), 0 },
+-
+-  { NULL, 0, NULL, 0, N_("Output control:"), 0 },
+-  { "numeric-addresses", 'N', NULL, 0,
+-    N_("Do not find symbol names for addresses in DWARF data"), 0 },
+-  { "unresolved-address-offsets", 'U', NULL, 0,
+-    N_("Display just offsets instead of resolving values to addresses in DWARF data"), 0 },
+-  { "wide", 'W', NULL, 0,
+-    N_("Ignored for compatibility (lines always wide)"), 0 },
+-  { "decompress", 'z', NULL, 0,
+-    N_("Show compression information for compressed sections (when used with -S); decompress section before dumping data (when used with -p or -x)"), 0 },
+-  { NULL, 0, NULL, 0, NULL, 0 }
+-};
+-
+-/* Short description of program.  */
+-static const char doc[] = N_("\
+-Print information from ELF file in human-readable form.");
+-
+-/* Strings for arguments in help texts.  */
+-static const char args_doc[] = N_("FILE...");
+-
+-/* Prototype for option handler.  */
+-static error_t parse_opt (int key, char *arg, struct argp_state *state);
+-
+-/* Data structure to communicate with argp functions.  */
+-static struct argp argp =
+-{
+-  options, parse_opt, args_doc, doc, NULL, NULL, NULL
+-};
+-
+ /* If non-null, the section from which we should read to (compressed) ELF.  */
+ static const char *elf_input_section = NULL;
+ 
+@@ -175,55 +99,55 @@
+ /* Flags set by the option controlling the output.  */
+ 
+ /* True if dynamic segment should be printed.  */
+-static bool print_dynamic_table;
++static bool print_dynamic_table = true;
+ 
+ /* True if the file header should be printed.  */
+-static bool print_file_header;
++static bool print_file_header = true;
+ 
+ /* True if the program headers should be printed.  */
+-static bool print_program_header;
++static bool print_program_header = true;
+ 
+ /* True if relocations should be printed.  */
+-static bool print_relocations;
++static bool print_relocations = true;
+ 
+ /* True if the section headers should be printed.  */
+-static bool print_section_header;
++static bool print_section_header = true;
+ 
+ /* True if the symbol table should be printed.  */
+-static bool print_symbol_table;
++static bool print_symbol_table = true;
+ 
+ /* True if (only) the dynsym table should be printed.  */
+-static bool print_dynsym_table;
++static bool print_dynsym_table = true;
+ 
+ /* A specific section name, or NULL to print all symbol tables.  */
+-static char *symbol_table_section;
++static char *symbol_table_section = NULL;
+ 
+ /* A specific section name, or NULL to print all ELF notes.  */
+-static char *notes_section;
++static char *notes_section = NULL;
+ 
+ /* True if the version information should be printed.  */
+-static bool print_version_info;
++static bool print_version_info = true;
+ 
+ /* True if section groups should be printed.  */
+-static bool print_section_groups;
++static bool print_section_groups = true;
+ 
+ /* True if bucket list length histogram should be printed.  */
+-static bool print_histogram;
++static bool print_histogram = true;
+ 
+ /* True if the architecture specific data should be printed.  */
+-static bool print_arch;
++static bool print_arch = true;
+ 
+ /* True if note section content should be printed.  */
+-static bool print_notes;
++static bool print_notes = true;
+ 
+ /* True if SHF_STRINGS section content should be printed.  */
+-static bool print_string_sections;
++static bool print_string_sections = true;
+ 
+ /* True if archive index should be printed.  */
+-static bool print_archive_index;
++static bool print_archive_index = true;
+ 
+ /* True if any of the control options except print_archive_index is set.  */
+-static bool any_control_option;
++static bool any_control_option = true;
+ 
+ /* True if we should print addresses from DWARF in symbolic form.  */
+ static bool print_address_names = true;
+@@ -232,15 +156,17 @@
+ static bool print_unresolved_addresses = false;
+ 
+ /* True if we should print the .debug_aranges section using libdw.  */
+-static bool decodedaranges = false;
++static bool decodedaranges = true;
+ 
+ /* True if we should print the .debug_aranges section using libdw.  */
+-static bool decodedline = false;
++static bool decodedline = true;
+ 
+ /* True if we want to show more information about compressed sections.  */
+-static bool print_decompress = false;
++static bool print_decompress = true;
+ 
+-/* True if we want to show split compile units for debug_info skeletons.  */
++/* True if we want to show split compile units for debug_info skeletons.
++	TODO: Enable this as well
++*/
+ static bool show_split_units = false;
+ 
+ /* Select printing of debugging sections.  */
+@@ -289,7 +215,7 @@
+ 
+ 
+ /* Declarations of local functions.  */
+-static void process_file (int fd, const char *fname, bool only_one);
++void process_file (int fd, const char *fname, bool only_one);
+ static void process_elf_file (Dwfl_Module *dwflmod, int fd);
+ static void print_ehdr (Ebl *ebl, GElf_Ehdr *ehdr);
+ static void print_shdr (Ebl *ebl, GElf_Ehdr *ehdr);
+@@ -324,64 +250,6 @@
+ static char *no_str;
+ 
+ static void
+-cleanup_list (struct section_argument *list)
+-{
+-  while (list != NULL)
+-    {
+-      struct section_argument *a = list;
+-      list = a->next;
+-      free (a);
+-    }
+-}
+-
+-int
+-main (int argc, char *argv[])
+-{
+-  /* We use no threads here which can interfere with handling a stream.  */
+-  (void) __fsetlocking (stdout, FSETLOCKING_BYCALLER);
+-
+-  /* Set locale.  */
+-  setlocale (LC_ALL, "");
+-
+-  /* Initialize the message catalog.  */
+-  textdomain (PACKAGE_TARNAME);
+-
+-  /* Look up once.  */
+-  yes_str = _("yes");
+-  no_str = _("no");
+-
+-  /* Parse and process arguments.  */
+-  int remaining;
+-  argp_parse (&argp, argc, argv, 0, &remaining, NULL);
+-
+-  /* Before we start tell the ELF library which version we are using.  */
+-  elf_version (EV_CURRENT);
+-
+-  /* Now process all the files given at the command line.  */
+-  bool only_one = remaining + 1 == argc;
+-  do
+-    {
+-      /* Open the file.  */
+-      int fd = open (argv[remaining], O_RDONLY);
+-      if (fd == -1)
+-	{
+-	  error (0, errno, _("cannot open input file '%s'"), argv[remaining]);
+-	  continue;
+-	}
+-
+-      process_file (fd, argv[remaining], only_one);
+-
+-      close (fd);
+-    }
+-  while (++remaining < argc);
+-
+-  cleanup_list (dump_data_sections);
+-  cleanup_list (string_sections);
+-
+-  return error_message_count != 0;
+-}
+-
+-static void
+ add_dump_section (const char *name,
+ 		  int key,
+ 		  bool implicit)
+@@ -396,216 +264,6 @@
+   *tailp = &a->next;
+ }
+ 
+-/* Handle program arguments.  */
+-static error_t
+-parse_opt (int key, char *arg,
+-	   struct argp_state *state __attribute__ ((unused)))
+-{
+-  switch (key)
+-    {
+-    case 'a':
+-      print_file_header = true;
+-      print_program_header = true;
+-      print_relocations = true;
+-      print_section_header = true;
+-      print_symbol_table = true;
+-      print_version_info = true;
+-      print_dynamic_table = true;
+-      print_section_groups = true;
+-      print_histogram = true;
+-      print_arch = true;
+-      print_notes = true;
+-      implicit_debug_sections |= section_exception;
+-      add_dump_section (".strtab", key, true);
+-      add_dump_section (".dynstr", key, true);
+-      add_dump_section (".comment", key, true);
+-      any_control_option = true;
+-      break;
+-    case 'A':
+-      print_arch = true;
+-      any_control_option = true;
+-      break;
+-    case 'd':
+-      print_dynamic_table = true;
+-      any_control_option = true;
+-      break;
+-    case 'e':
+-      print_debug_sections |= section_exception;
+-      any_control_option = true;
+-      break;
+-    case 'g':
+-      print_section_groups = true;
+-      any_control_option = true;
+-      break;
+-    case 'h':
+-      print_file_header = true;
+-      any_control_option = true;
+-      break;
+-    case 'I':
+-      print_histogram = true;
+-      any_control_option = true;
+-      break;
+-    case 'l':
+-      print_program_header = true;
+-      any_control_option = true;
+-      break;
+-    case 'n':
+-      print_notes = true;
+-      any_control_option = true;
+-      notes_section = arg;
+-      break;
+-    case 'r':
+-      print_relocations = true;
+-      any_control_option = true;
+-     break;
+-    case 'S':
+-      print_section_header = true;
+-      any_control_option = true;
+-      break;
+-    case 's':
+-      print_symbol_table = true;
+-      any_control_option = true;
+-      symbol_table_section = arg;
+-      break;
+-    case PRINT_DYNSYM_TABLE:
+-      print_dynsym_table = true;
+-      any_control_option = true;
+-      break;
+-    case 'V':
+-      print_version_info = true;
+-      any_control_option = true;
+-      break;
+-    case 'c':
+-      print_archive_index = true;
+-      break;
+-    case 'w':
+-      if (arg == NULL)
+-	{
+-	  print_debug_sections = section_all;
+-	  implicit_debug_sections = section_info;
+-	  show_split_units = true;
+-	}
+-      else if (strcmp (arg, "abbrev") == 0)
+-	print_debug_sections |= section_abbrev;
+-      else if (strcmp (arg, "addr") == 0)
+-	{
+-	  print_debug_sections |= section_addr;
+-	  implicit_debug_sections |= section_info;
+-	}
+-      else if (strcmp (arg, "aranges") == 0)
+-	print_debug_sections |= section_aranges;
+-      else if (strcmp (arg, "decodedaranges") == 0)
+-	{
+-	  print_debug_sections |= section_aranges;
+-	  decodedaranges = true;
+-	}
+-      else if (strcmp (arg, "ranges") == 0)
+-	{
+-	  print_debug_sections |= section_ranges;
+-	  implicit_debug_sections |= section_info;
+-	}
+-      else if (strcmp (arg, "frame") == 0 || strcmp (arg, "frames") == 0)
+-	print_debug_sections |= section_frame;
+-      else if (strcmp (arg, "info") == 0)
+-	{
+-	  print_debug_sections |= section_info;
+-	  print_debug_sections |= section_types;
+-	}
+-      else if (strcmp (arg, "info+") == 0)
+-	{
+-	  print_debug_sections |= section_info;
+-	  print_debug_sections |= section_types;
+-	  show_split_units = true;
+-	}
+-      else if (strcmp (arg, "loc") == 0)
+-	{
+-	  print_debug_sections |= section_loc;
+-	  implicit_debug_sections |= section_info;
+-	}
+-      else if (strcmp (arg, "line") == 0)
+-	print_debug_sections |= section_line;
+-      else if (strcmp (arg, "decodedline") == 0)
+-	{
+-	  print_debug_sections |= section_line;
+-	  decodedline = true;
+-	}
+-      else if (strcmp (arg, "pubnames") == 0)
+-	print_debug_sections |= section_pubnames;
+-      else if (strcmp (arg, "str") == 0)
+-	{
+-	  print_debug_sections |= section_str;
+-	  /* For mapping string offset tables to CUs.  */
+-	  implicit_debug_sections |= section_info;
+-	}
+-      else if (strcmp (arg, "macinfo") == 0)
+-	print_debug_sections |= section_macinfo;
+-      else if (strcmp (arg, "macro") == 0)
+-	print_debug_sections |= section_macro;
+-      else if (strcmp (arg, "exception") == 0)
+-	print_debug_sections |= section_exception;
+-      else if (strcmp (arg, "gdb_index") == 0)
+-	print_debug_sections |= section_gdb_index;
+-      else
+-	{
+-	  fprintf (stderr, _("Unknown DWARF debug section `%s'.\n"),
+-		   arg);
+-	  argp_help (&argp, stderr, ARGP_HELP_SEE,
+-		     program_invocation_short_name);
+-	  exit (1);
+-	}
+-      any_control_option = true;
+-      break;
+-    case 'p':
+-      any_control_option = true;
+-      if (arg == NULL)
+-	{
+-	  print_string_sections = true;
+-	  break;
+-	}
+-      FALLTHROUGH;
+-    case 'x':
+-      add_dump_section (arg, key, false);
+-      any_control_option = true;
+-      break;
+-    case 'N':
+-      print_address_names = false;
+-      break;
+-    case 'U':
+-      print_unresolved_addresses = true;
+-      break;
+-    case ARGP_KEY_NO_ARGS:
+-      fputs (_("Missing file name.\n"), stderr);
+-      goto do_argp_help;
+-    case ARGP_KEY_FINI:
+-      if (! any_control_option && ! print_archive_index)
+-	{
+-	  fputs (_("No operation specified.\n"), stderr);
+-	do_argp_help:
+-	  argp_help (&argp, stderr, ARGP_HELP_SEE,
+-		     program_invocation_short_name);
+-	  exit (EXIT_FAILURE);
+-	}
+-      break;
+-    case 'W':			/* Ignored.  */
+-      break;
+-    case 'z':
+-      print_decompress = true;
+-      break;
+-    case ELF_INPUT_SECTION:
+-      if (arg == NULL)
+-	elf_input_section = ".gnu_debugdata";
+-      else
+-	elf_input_section = arg;
+-      break;
+-    case DWARF_SKELETON:
+-      dwarf_skeleton = arg;
+-      break;
+-    default:
+-      return ARGP_ERR_UNKNOWN;
+-    }
+-  return 0;
+-}
+-
+ 
+ /* Create a file descriptor to read the data from the
+    elf_input_section given a file descriptor to an ELF file.  */
+@@ -861,16 +519,47 @@
+ }
+ 
+ /* Process one input file.  */
+-static void
++void
+ process_file (int fd, const char *fname, bool only_one)
+ {
++	printf("lol\n");
++
++	/* Now get the ELF descriptor.  */
++	Elf *elf = elf_begin (fd, ELF_C_READ_MMAP, NULL);
++	if (elf != NULL) {
++		if (elf_kind (elf) !=  ELF_K_ELF) {
++			elf_end (elf);
++			return;
++		}
++		elf_end (elf);
++	}
++
++	print_file_header = true;
++	print_program_header = true;
++	print_relocations = true;
++	print_section_header = true;
++	print_symbol_table = true;
++	print_version_info = true;
++	print_dynamic_table = true;
++	print_section_groups = true;
++	print_string_sections = true;
++	print_histogram = true;
++	print_arch = true;
++	print_notes = true;
++	print_debug_sections = section_all;
++	implicit_debug_sections = section_info;
++	add_dump_section (".strtab", 'x', true);
++	add_dump_section (".dynstr", 'x', true);
++	add_dump_section (".comment", 'x', true);
++	any_control_option = true;
++	
+   if (print_archive_index)
+     check_archive_index (fd, fname, only_one);
+ 
+   if (!any_control_option)
+     return;
+ 
+-  if (elf_input_section != NULL)
++  if (false)
+     {
+       /* Replace fname and fd with section content. */
+       char *fnname = alloca (strlen (fname) + strlen (elf_input_section) + 2);
+@@ -1026,8 +715,9 @@
+     dump_data (pure_ebl);
+   if (string_sections != NULL)
+     dump_strings (ebl);
+-  if ((print_debug_sections | implicit_debug_sections) != 0)
+-    print_debug (dwflmod, ebl, ehdr);
++  // TODO: Something weird here. fix later
++  //if ((print_debug_sections | implicit_debug_sections) != 0)
++  //  print_debug (dwflmod, ebl, ehdr);
+   if (print_notes)
+     handle_notes (pure_ebl, ehdr);
+   if (print_string_sections)
+@@ -11211,7 +10901,8 @@
+ 	 a skeleton file, replace the given dwflmod and dbg, with one
+ 	 derived from the skeleton file to provide enough context.  */
+       uint64_t split_id;
+-      if (is_split_dwarf (dbg, &split_id, &split_cu))
++	  // TODO fix this, detect .dwo files specifically this breaks
++      if (false && is_split_dwarf (dbg, &split_id, &split_cu))
+ 	{
+ 	  if (dwarf_skeleton != NULL)
+ 	    skel_name = strdup (dwarf_skeleton);
