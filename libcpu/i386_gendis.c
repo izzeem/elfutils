@@ -38,6 +38,7 @@
 #include "system.h"
 
 extern int i386_parse (void);
+const char* __asan_default_options(void) { return "detect_leaks=0"; }
 
 
 extern FILE *i386_in;

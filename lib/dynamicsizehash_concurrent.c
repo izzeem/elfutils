@@ -285,7 +285,7 @@ resize_master(NAME *htab)
   free(htab->old_table);
 
   /* Change state to NO_RESIZING */
-  atomic_fetch_xor_explicit(&htab->resizing_state, CLEANING ^ NO_RESIZING,
+  atomic_fetch_xor_explicit(&htab->resizing_state, 1 << NO_RESIZING,
                             memory_order_relaxed);
 
 }

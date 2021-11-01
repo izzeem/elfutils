@@ -186,24 +186,6 @@ fi
 
 AC_SUBST([dso_LDFLAGS])
 
-AC_CACHE_CHECK([for __thread support], ac_cv_tls, [dnl
-# Use the same flags that we use for our DSOs, so the test is representative.
-# Some old compiler/linker/libc combinations fail some ways and not others.
-save_CFLAGS="$CFLAGS"
-save_LDFLAGS="$LDFLAGS"
-CFLAGS="$fpic_CFLAGS $CFLAGS"
-LDFLAGS="$dso_LDFLAGS $LDFLAGS"
-AC_LINK_IFELSE([dnl
-AC_LANG_PROGRAM([[#include <stdlib.h>
-#undef __thread
-static __thread int a; int foo (int b) { return a + b; }]],
-		[[exit (foo (0));]])],
-	       ac_cv_tls=yes, ac_cv_tls=no)
-CFLAGS="$save_CFLAGS"
-LDFLAGS="$save_LDFLAGS"])
-AS_IF([test "x$ac_cv_tls" != xyes],
-      AC_MSG_ERROR([__thread support required]))
-
 dnl Before 4.9 gcc doesn't ship stdatomic.h, but the necessary atomics are
 dnl available by (at least) 4.7. So if the system doesn't have a stdatomic.h we
 dnl fall back on one copied from FreeBSD that handles the difference.
@@ -704,22 +686,6 @@ fi
 AC_CHECK_PROG(HAVE_ZSTD, zstd, yes, no)
 AM_CONDITIONAL([HAVE_ZSTD],[test "x$HAVE_ZSTD" = "xyes"])
 
-# Look for libcurl for libdebuginfod minimum version as per rhel7.
-AC_ARG_ENABLE([libdebuginfod],AC_HELP_STRING([--enable-libdebuginfod], [Build debuginfod client library (can be =dummy)]))
-AS_IF([test "x$enable_libdebuginfod" != "xno"], [
-    if test "x$enable_libdebuginfod" != "xdummy"; then
-      AC_MSG_NOTICE([checking libdebuginfod dependencies, --disable-libdebuginfod or --enable-libdebuginfo=dummy to skip])
-      enable_libdebuginfod=yes # presume success
-      PKG_PROG_PKG_CONFIG
-      PKG_CHECK_MODULES([libcurl],[libcurl >= 7.29.0],[],[enable_libdebuginfod=no])
-      if test "x$enable_libdebuginfod" = "xno"; then
-        AC_MSG_ERROR([dependencies not found, use --disable-libdebuginfod to disable or --enable-libdebuginfod=dummy to build a (bootstrap) dummy library.])
-      fi
-    else
-      AC_MSG_NOTICE([building (bootstrap) dummy libdebuginfo library])
-    fi
-])
-
 AC_CHECK_LIB(pthread, pthread_setname_np, [
                       AC_DEFINE([HAVE_PTHREAD_SETNAME_NP],[1],[Enable pthread_setname_np])])
 
@@ -730,26 +696,8 @@ AS_IF([test "x$enable_libdebuginfod" = "xdummy"],
 AM_CONDITIONAL([LIBDEBUGINFOD],[test "x$enable_libdebuginfod" = "xyes" || test "x$enable_libdebuginfod" = "xdummy"])
 AM_CONDITIONAL([DUMMY_LIBDEBUGINFOD],[test "x$enable_libdebuginfod" = "xdummy"])
 
-# Look for libmicrohttpd, libarchive, sqlite for debuginfo server
-# minimum versions as per rhel7.
 AC_ARG_ENABLE([debuginfod],AC_HELP_STRING([--enable-debuginfod], [Build debuginfod server]))
 AC_PROG_CXX
-AS_IF([test "x$enable_debuginfod" != "xno"], [
-    AC_MSG_NOTICE([checking debuginfod C++11 support, --disable-debuginfod to skip])
-    AX_CXX_COMPILE_STDCXX(11, noext, mandatory)
-    AC_MSG_NOTICE([checking debuginfod dependencies, --disable-debuginfod to skip])
-    if test "x$enable_libdebuginfod" = "xno"; then
-      AC_MSG_ERROR([need libdebuginfod (or dummy), use --disable-debuginfod to disable.])
-    fi
-    enable_debuginfod=yes # presume success
-    PKG_PROG_PKG_CONFIG
-    PKG_CHECK_MODULES([libmicrohttpd],[libmicrohttpd >= 0.9.33],[],[enable_debuginfod=no])
-    PKG_CHECK_MODULES([sqlite3],[sqlite3 >= 3.7.17],[],[enable_debuginfod=no])
-    PKG_CHECK_MODULES([libarchive],[libarchive >= 3.1.2],[],[enable_debuginfod=no])
-    if test "x$enable_debuginfod" = "xno"; then
-      AC_MSG_ERROR([dependencies not found, use --disable-debuginfod to disable.])
-    fi
-])
 
 AS_IF([test "x$enable_debuginfod" != "xno"],AC_DEFINE([ENABLE_DEBUGINFOD],[1],[Build debuginfod]))
 AM_CONDITIONAL([DEBUGINFOD],[test "x$enable_debuginfod" = "xyes"])

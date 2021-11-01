@@ -41,7 +41,7 @@
 
 
 /* The error number.  */
-static __thread int global_error;
+static int global_error;
 
 
 int
@@ -147,7 +147,7 @@ errnomsg(int error)
   return strerror_r (error, unknown, 0);
 #else
   /* To store the error message from strerror_r in a thread-safe manner */
-  static __thread char msg[128];
+  static char msg[128];
   return strerror_r (error, msg, sizeof (msg)) ? unknown : msg;
 #endif
 }
